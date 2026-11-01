@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RentSite Pro - Gestão de Aluguel de Sites & Cobranças</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- TOP NAVIGATION / HEADER -->
+    <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-emerald-500 text-slate-900 p-2 rounded-lg font-bold">
+                        <i class="fa-solid fa-globe text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">RentSite Pro <span class="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-mono ml-2">Python + SQLite</span></h1>
+                        <p class="text-xs text-slate-400">Gestão de Aluguel de Sites & Cobranças</p>
+                    </div>
+                </div>
+
+                <!-- Header Actions -->
+                <div class="flex items-center space-x-3">
+                    <button onclick="syncWithPeerServer()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center border border-slate-700" title="Sincronizar com outra máquina">
+                        <i class="fa-solid fa-rotate text-emerald-400 mr-2"></i> Sincronizar (Multi-Máquina)
+                    </button>
+                    <button onclick="openClientModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition flex items-center shadow-sm">
+                        <i class="fa-solid fa-plus mr-2"></i> Novo Site/Cliente
+                    </button>
+                    <button onclick="switchTab('settings')" class="p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Configurações">
+                        <i class="fa-solid fa-gear text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+
+        <!-- DASHBOARD METRICS -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Clientes Ativos</p>
+                    <h3 id="metric-active-clients" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+                    <p class="text-xs text-emerald-600 mt-1 flex items-center font-medium">
+                        <i class="fa-solid fa-circle-check mr-1"></i> Em dia
+                    </p>
+                </div>
+                <div class="bg-emerald-50 text-emerald-600 p-3.5 rounded-xl text-xl">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Faturamento Previsto (Mês)</p>
+                    <h3 id="metric-monthly-revenue" class="text-2xl font-bold text-slate-800 mt-1">R$ 0,00</h3>
+                    <p class="text-xs text-slate-500 mt-1">Normalizado Mensalmente</p>
+                </div>
+                <div class="bg-blue-50 text-blue-600 p-3.5 rounded-xl text-xl">
+                    <i class="fa-solid fa-sack-dollar"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Recebido no Mês</p>
+                    <h3 id="metric-received-revenue" class="text-2xl font-bold text-slate-800 mt-1">R$ 0,00</h3>
+                    <p class="text-xs text-emerald-600 mt-1 font-medium" id="metric-received-percent">0% do previsto</p>
+                </div>
+                <div class="bg-teal-50 text-teal-600 p-3.5 rounded-xl text-xl">
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Atrasados / Pendentes</p>
+                    <h3 id="metric-pending-clients" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+                    <p class="text-xs text-rose-600 mt-1 font-medium flex items-center">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> Requer atenção
+                    </p>
+                </div>
+                <div class="bg-rose-50 text-rose-600 p-3.5 rounded-xl text-xl">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- NAVIGATION TABS & SEARCH -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div class="flex bg-slate-200 p-1 rounded-xl w-full md:w-auto self-start">
+                <button id="tab-btn-dashboard" onclick="switchTab('dashboard')" class="flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-semibold transition bg-white text-slate-800 shadow-sm">
+                    <i class="fa-solid fa-list mr-1.5"></i> Gestão de Aluguéis
+                </button>
+                <button id="tab-btn-settings" onclick="switchTab('settings')" class="flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:text-slate-900">
+                    <i class="fa-solid fa-sliders mr-1.5"></i> Configurações & Sincronização
+                </button>
+            </div>
+
+            <div id="filter-controls" class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <div class="relative flex-1 sm:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="search-input" oninput="renderTable()" placeholder="Buscar cliente, domínio..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <select id="status-filter" onchange="renderTable()" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700">
+                    <option value="all">Todos os Status</option>
+                    <option value="due-soon">Vencendo em Breve (3 dias)</option>
+                    <option value="overdue">Atrasados</option>
+                    <option value="paid">Pagos (Ativos)</option>
+                    <option value="suspended">Suspensos</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- TAB 1: DASHBOARD & CLIENTS TABLE -->
+        <section id="tab-content-dashboard" class="space-y-6">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                                <th class="py-3.5 px-4">Cliente & WhatsApp</th>
+                                <th class="py-3.5 px-4">Site / Domínio</th>
+                                <th class="py-3.5 px-4">Valor & Ciclo</th>
+                                <th class="py-3.5 px-4">Vencimento</th>
+                                <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4 text-center">Régua WhatsApp</th>
+                                <th class="py-3.5 px-4 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clients-table-body" class="divide-y divide-slate-200 text-sm">
+                            <!-- JS populated rows -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-state" class="hidden p-12 text-center">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 text-slate-400 mb-4">
+                        <i class="fa-solid fa-folder-open text-2xl"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-slate-700">Nenhum registro encontrado</h3>
+                    <p class="text-sm text-slate-500 mt-1">Cadastre um novo aluguel de site para começar o gerenciamento.</p>
+                    <button onclick="openClientModal()" class="mt-4 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-500 transition">
+                        <i class="fa-solid fa-plus mr-2"></i> Adicionar Cliente
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: CONFIGURAÇÕES E SINCRONIZAÇÃO -->
+        <section id="tab-content-settings" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Settings Form -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="border-b border-slate-100 pb-3">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-user-gear text-emerald-600 mr-2"></i> Perfil do Gestor
+                        </h2>
+                        <p class="text-xs text-slate-500">Dados salvos no banco SQLite e utilizados no envio de cobranças.</p>
+                    </div>
+
+                    <form id="settings-form" onsubmit="saveSettings(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome do Gestor/Empresa</label>
+                            <input type="text" id="setting-manager-name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Ex: WebStudio Digital">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Seu WhatsApp (Receber Alertas)</label>
+                            <input type="text" id="setting-manager-phone" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Ex: 5511999998888">
+                            <span class="text-xs text-slate-400">Com código do país e DDD (Apenas números).</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Chave PIX Padrão</label>
+                            <input type="text" id="setting-default-pix" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Ex: CNPJ, E-mail, Celular ou Aleatória">
+                        </div>
+
+                        <button type="submit" class="w-full bg-slate-900 text-white font-medium py-2.5 rounded-lg text-sm hover:bg-slate-800 transition">
+                            <i class="fa-solid fa-floppy-disk mr-2"></i> Salvar no Banco SQLite
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Multi-Machine Sync & Backup -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+                    <div>
+                        <div class="border-b border-slate-100 pb-3 mb-4">
+                            <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                                <i class="fa-solid fa-rotate text-blue-600 mr-2"></i> Sincronização Multi-Máquina (Timestamp Engine)
+                            </h2>
+                            <p class="text-xs text-slate-500">Sincronize duas máquinas comparando a data/hora exata da última modificação.</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                                <h4 class="text-sm font-semibold text-slate-800">Sincronizar via URL / IP de Rede</h4>
+                                <p class="text-xs text-slate-500">Digite o IP/URL da outra máquina na rede para mesclar os dados em tempo real:</p>
+                                <div class="flex gap-2">
+                                    <input type="text" id="peer-server-url" placeholder="http://192.168.1.50:5000" class="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-xs">
+                                    <button onclick="syncWithPeerServer()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium">Sincronizar</button>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <h4 class="text-sm font-semibold text-slate-800">Exportar Backup JSON</h4>
+                                    <p class="text-xs text-slate-500">Baixar arquivo com timestamps da base.</p>
+                                </div>
+                                <button onclick="exportJSON()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                                    <i class="fa-solid fa-download mr-1"></i> Exportar
+                                </button>
+                            </div>
+
+                            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <h4 class="text-sm font-semibold text-slate-800">Importar & Mesclar JSON</h4>
+                                    <p class="text-xs text-slate-500">Atualiza mantendo a alteração mais recente.</p>
+                                </div>
+                                <input type="file" id="import-file" accept=".json" class="hidden" onchange="importJSON(event)">
+                                <button onclick="document.getElementById('import-file').click()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-medium">
+                                    <i class="fa-solid fa-upload mr-1"></i> Importar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100 text-xs text-slate-400">
+                        Banco de dados ativo: <strong>SQLite (`rentsite.db`)</strong>. As modificações são persistidas automaticamente.
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            RentSite Pro &copy; <span id="current-year"></span> - Painel Gestor de Aluguéis de Sites em Python + SQLite.
+        </div>
+    </footer>
+
+    <!-- MODAL: CADASTRAR / EDITAR CLIENTE -->
+    <div id="modal-client" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                <h3 id="modal-client-title" class="font-bold text-base flex items-center">
+                    <i class="fa-solid fa-globe text-emerald-400 mr-2"></i> Cadastrar Aluguel de Site
+                </h3>
+                <button onclick="closeClientModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="client-form" onsubmit="saveClient(event)" class="p-6 space-y-4">
+                <input type="hidden" id="client-id">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome do Cliente *</label>
+                        <input type="text" id="form-name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Ex: João Silva">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">WhatsApp (com DDI/DDD) *</label>
+                        <input type="text" id="form-phone" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Ex: 5511988887777">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome do Site / Projeto</label>
+                        <input type="text" id="form-sitename" placeholder="Ex: E-commerce Garimpo" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Domínio do Site *</label>
+                        <input type="text" id="form-domain" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Ex: garimpoweb.com">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Valor do Ciclo (R$) *</label>
+                        <input type="number" step="0.01" id="form-value" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="150.00">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Período de Vencimento *</label>
+                        <select id="form-billingperiod" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                            <option value="monthly">Mensal</option>
+                            <option value="quarterly">Trimestral (3 meses)</option>
+                            <option value="semiannual">Semestral (6 meses)</option>
+                            <option value="annual">Anual (12 meses)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Dia Venc. (1-31) *</label>
+                        <input type="number" min="1" max="31" id="form-dueday" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="10">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Status</label>
+                        <select id="form-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                            <option value="active">Ativo (Pago)</option>
+                            <option value="pending">Pendente</option>
+                            <option value="overdue">Atrasado</option>
+                            <option value="suspended">Suspenso</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Data Úl. Pagamento</label>
+                        <input type="date" id="form-lastpay" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Chave PIX Específica</label>
+                        <input type="text" id="form-pix" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="Opcional (Usa padrão se vazio)">
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeClientModal()" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium shadow-sm">Salvar Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ENVIAR WHATSAPP -->
+    <div id="modal-whatsapp" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+            <div class="bg-emerald-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center">
+                    <i class="fa-brands fa-whatsapp text-xl mr-2"></i> Disparo de Mensagem WhatsApp
+                </h3>
+                <button onclick="closeWhatsAppModal()" class="text-emerald-100 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Selecione o Template da Régua</label>
+                    <select id="wa-template-select" onchange="applyWATemplate()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        <option value="due-3">Lembrete (3 dias antes do Vencimento)</option>
+                        <option value="due-today">Aviso Dia D (Vence Hoje)</option>
+                        <option value="overdue">Alerta de Atraso (Cobrança urgente)</option>
+                        <option value="payment-confirm">Confirmação de Pagamento Recebido</option>
+                        <option value="manager-notify">Notificar Gestor (Alerta de Inadimplência/Pagamento)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-semibold text-slate-600 uppercase">Edite a Mensagem Antes de Enviar</label>
+                        <span class="text-xs text-slate-400">Texto totalmente editável</span>
+                    </div>
+                    <textarea id="wa-message-text" rows="8" class="w-full p-3 border border-slate-300 rounded-lg text-sm font-mono text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeWhatsAppModal()" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm">Cancelar</button>
+                    <button type="button" onclick="triggerWASend()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium shadow-md flex items-center">
+                        <i class="fa-brands fa-whatsapp text-lg mr-2"></i> Abrir WhatsApp Web & Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC INTEGRATED WITH PYTHON BACKEND -->
+    <script>
+        const PERIOD_MAP = {
+            'monthly': { label: 'Mensal', months: 1 },
+            'quarterly': { label: 'Trimestral', months: 3 },
+            'semiannual': { label: 'Semestral', months: 6 },
+            'annual': { label: 'Anual', months: 12 }
+        };
+
+        let clients = [];
+        let settings = { managerName: '', managerPhone: '', defaultPix: '' };
+        let currentWAContext = { clientId: null, targetPhone: '' };
+
+        window.onload = function() {
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            fetchSettings();
+            fetchClients();
+        };
+
+        // API CALLS
+        async function fetchSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                settings = await res.json();
+                document.getElementById('setting-manager-name').value = settings.managerName || '';
+                document.getElementById('setting-manager-phone').value = settings.managerPhone || '';
+                document.getElementById('setting-default-pix').value = settings.defaultPix || '';
+            } catch (err) {
+                console.error("Erro ao carregar configurações:", err);
+            }
+        }
+
+        async function saveSettings(e) {
+            e.preventDefault();
+            const payload = {
+                managerName: document.getElementById('setting-manager-name').value,
+                managerPhone: document.getElementById('setting-manager-phone').value.replace(/\D/g, ''),
+                defaultPix: document.getElementById('setting-default-pix').value
+            };
+
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            settings = payload;
+            alert('Configurações salvas no banco SQLite com sucesso!');
+        }
+
+        async function fetchClients() {
+            try {
+                const res = await fetch('/api/clients');
+                clients = await res.json();
+                renderTable();
+                updateMetrics();
+            } catch (err) {
+                console.error("Erro ao carregar clientes:", err);
+            }
+        }
+
+        // NAVIGATION TABS
+        function switchTab(tab) {
+            const dashTab = document.getElementById('tab-content-dashboard');
+            const settingsTab = document.getElementById('tab-content-settings');
+            const dashBtn = document.getElementById('tab-btn-dashboard');
+            const settingsBtn = document.getElementById('tab-btn-settings');
+            const filterControls = document.getElementById('filter-controls');
+
+            if (tab === 'dashboard') {
+                dashTab.classList.remove('hidden');
+                settingsTab.classList.add('hidden');
+                filterControls.classList.remove('hidden');
+
+                dashBtn.className = "flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-semibold transition bg-white text-slate-800 shadow-sm";
+                settingsBtn.className = "flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:text-slate-900";
+            } else {
+                dashTab.classList.add('hidden');
+                settingsTab.classList.remove('hidden');
+                filterControls.classList.add('hidden');
+
+                settingsBtn.className = "flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-semibold transition bg-white text-slate-800 shadow-sm";
+                dashBtn.className = "flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:text-slate-900";
+            }
+        }
+
+        // METRICS CALCULATIONS
+        function updateMetrics() {
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+
+            let activeCount = 0;
+            let totalMonthlyRevenue = 0;
+            let receivedRevenue = 0;
+            let pendingCount = 0;
+
+            clients.forEach(c => {
+                const val = parseFloat(c.value) || 0;
+                const periodKey = c.billingPeriod || 'monthly';
+                const periodMonths = PERIOD_MAP[periodKey] ? PERIOD_MAP[periodKey].months : 1;
+                
+                const normalizedMonthlyValue = val / periodMonths;
+                totalMonthlyRevenue += normalizedMonthlyValue;
+
+                if (c.status === 'active') activeCount++;
+                if (c.status === 'overdue' || c.status === 'pending') pendingCount++;
+
+                if (c.lastPayment) {
+                    const payDate = new Date(c.lastPayment + 'T00:00:00');
+                    if (payDate.getMonth() === currentMonth && payDate.getFullYear() === currentYear) {
+                        receivedRevenue += normalizedMonthlyValue;
+                    }
+                }
+            });
+
+            document.getElementById('metric-active-clients').textContent = activeCount;
+            document.getElementById('metric-monthly-revenue').textContent = formatCurrency(totalMonthlyRevenue);
+            document.getElementById('metric-received-revenue').textContent = formatCurrency(receivedRevenue);
+            document.getElementById('metric-pending-clients').textContent = pendingCount;
+
+            const percent = totalMonthlyRevenue > 0 ? Math.round((receivedRevenue / totalMonthlyRevenue) * 100) : 0;
+            document.getElementById('metric-received-percent').textContent = `${percent}% do faturamento previsto`;
+        }
+
+        // RENDER CLIENTS TABLE
+        function renderTable() {
+            const tbody = document.getElementById('clients-table-body');
+            const emptyState = document.getElementById('empty-state');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filter = document.getElementById('status-filter').value;
+
+            tbody.innerHTML = '';
+
+            const filteredClients = clients.filter(client => {
+                const matchesSearch = client.name.toLowerCase().includes(search) || 
+                                      client.domain.toLowerCase().includes(search) ||
+                                      (client.siteName && client.siteName.toLowerCase().includes(search));
+
+                let matchesStatus = true;
+                const calcStatus = getCalculatedStatus(client);
+
+                if (filter === 'due-soon') matchesStatus = (calcStatus.type === 'due-soon');
+                else if (filter === 'overdue') matchesStatus = (calcStatus.type === 'overdue');
+                else if (filter === 'paid') matchesStatus = (client.status === 'active');
+                else if (filter === 'suspended') matchesStatus = (client.status === 'suspended');
+
+                return matchesSearch && matchesStatus;
+            });
+
+            if (filteredClients.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filteredClients.forEach(client => {
+                const statusInfo = getCalculatedStatus(client);
+                const periodInfo = PERIOD_MAP[client.billingPeriod || 'monthly'] || PERIOD_MAP['monthly'];
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition border-b border-slate-100";
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4">
+                        <div class="font-semibold text-slate-800">${escapeHtml(client.name)}</div>
+                        <div class="text-xs text-slate-500 flex items-center mt-0.5">
+                            <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> ${escapeHtml(client.phone)}
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <div class="font-medium text-slate-700">${escapeHtml(client.siteName || 'Sem nome')}</div>
+                        <a href="https://${escapeHtml(client.domain)}" target="_blank" class="text-xs text-blue-600 hover:underline flex items-center mt-0.5">
+                            ${escapeHtml(client.domain)} <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i>
+                        </a>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <div class="font-semibold text-slate-800">${formatCurrency(client.value)}</div>
+                        <div class="text-[11px] text-slate-500 font-medium">${periodInfo.label}</div>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <div class="text-xs font-semibold text-slate-700">Dia ${client.dueDay}</div>
+                        <div class="text-[11px] text-slate-400">Próx: ${statusInfo.nextDueDateStr}</div>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusInfo.badgeClass}">
+                            <i class="${statusInfo.iconClass} mr-1.5"></i> ${statusInfo.label}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 text-center">
+                        <button onclick="openWhatsAppModal('${client.id}')" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-emerald-200">
+                            <i class="fa-brands fa-whatsapp mr-1 text-sm"></i> Cobrar / Avisar
+                        </button>
+                    </td>
+                    <td class="py-3.5 px-4 text-right space-x-1">
+                        <button onclick="quickRegisterPayment('${client.id}')" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white p-1.5 rounded-md text-xs font-medium transition" title="Dar Baixa no Pagamento">
+                            <i class="fa-solid fa-check"></i>
+                        </button>
+                        <button onclick="openClientModal('${client.id}')" class="bg-slate-100 text-slate-600 hover:bg-slate-200 p-1.5 rounded-md text-xs font-medium transition" title="Editar">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="deleteClient('${client.id}')" class="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white p-1.5 rounded-md text-xs font-medium transition" title="Excluir">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        // DATE COMPUTATION LOGIC
+        function getCalculatedStatus(client) {
+            if (client.status === 'suspended') {
+                return {
+                    label: 'Suspenso',
+                    badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200',
+                    iconClass: 'fa-solid fa-ban',
+                    type: 'suspended',
+                    nextDueDateStr: '-'
+                };
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const periodKey = client.billingPeriod || 'monthly';
+            const periodMonths = PERIOD_MAP[periodKey] ? PERIOD_MAP[periodKey].months : 1;
+
+            let dueDate;
+
+            if (client.lastPayment) {
+                const lastPayDate = new Date(client.lastPayment + 'T00:00:00');
+                let targetYear = lastPayDate.getFullYear();
+                let targetMonth = lastPayDate.getMonth() + periodMonths;
+
+                while (targetMonth > 11) {
+                    targetMonth -= 12;
+                    targetYear++;
+                }
+
+                dueDate = new Date(targetYear, targetMonth, client.dueDay);
+
+                if (dueDate < today && client.status !== 'overdue') {
+                    let curYear = today.getFullYear();
+                    let curMonth = today.getMonth();
+                    dueDate = new Date(curYear, curMonth, client.dueDay);
+                    if (dueDate < today) {
+                        dueDate.setMonth(dueDate.getMonth() + periodMonths);
+                    }
+                }
+            } else {
+                let curYear = today.getFullYear();
+                let curMonth = today.getMonth();
+                dueDate = new Date(curYear, curMonth, client.dueDay);
+                if (dueDate < today) {
+                    dueDate.setMonth(dueDate.getMonth() + periodMonths);
+                }
+            }
+
+            const diffTime = dueDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const dueDateFormatted = dueDate.toLocaleDateString('pt-BR');
+
+            if (diffDays < 0 || client.status === 'overdue') {
+                return {
+                    label: 'Atrasado',
+                    badgeClass: 'bg-rose-100 text-rose-700 border border-rose-200',
+                    iconClass: 'fa-solid fa-circle-exclamation',
+                    type: 'overdue',
+                    nextDueDateStr: dueDateFormatted
+                };
+            } else if (diffDays <= 3) {
+                return {
+                    label: diffDays === 0 ? 'Vence Hoje' : `Vence em ${diffDays}d`,
+                    badgeClass: 'bg-amber-100 text-amber-800 border border-amber-200',
+                    iconClass: 'fa-solid fa-clock',
+                    type: 'due-soon',
+                    nextDueDateStr: dueDateFormatted
+                };
+            } else {
+                return {
+                    label: 'Ativo / Em dia',
+                    badgeClass: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+                    iconClass: 'fa-solid fa-circle-check',
+                    type: 'active',
+                    nextDueDateStr: dueDateFormatted
+                };
+            }
+        }
+
+        // QUICK ACTION: BAIXA DE PAGAMENTO
+        async function quickRegisterPayment(clientId) {
+            const client = clients.find(c => c.id === clientId);
+            if (!client) return;
+
+            if (confirm(`Confirmar recebimento de pagamento de ${formatCurrency(client.value)} referente ao site ${client.domain}?`)) {
+                const todayStr = new Date().toISOString().split('T')[0];
+                client.lastPayment = todayStr;
+                client.status = 'active';
+
+                await fetch('/api/clients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(client)
+                });
+
+                await fetchClients();
+
+                if (confirm("Pagamento baixado com sucesso!\nDeseja enviar uma mensagem de confirmação para o WhatsApp do cliente agora?")) {
+                    openWhatsAppModal(clientId, 'payment-confirm');
+                }
+            }
+        }
+
+        // MODAL CLIENT MANAGEMENT
+        function openClientModal(clientId = null) {
+            const modal = document.getElementById('modal-client');
+            const title = document.getElementById('modal-client-title');
+
+            if (clientId) {
+                const client = clients.find(c => c.id === clientId);
+                if (!client) return;
+
+                title.innerHTML = '<i class="fa-solid fa-pen text-emerald-400 mr-2"></i> Editar Aluguel de Site';
+                document.getElementById('client-id').value = client.id;
+                document.getElementById('form-name').value = client.name;
+                document.getElementById('form-phone').value = client.phone;
+                document.getElementById('form-sitename').value = client.siteName || '';
+                document.getElementById('form-domain').value = client.domain;
+                document.getElementById('form-value').value = client.value;
+                document.getElementById('form-billingperiod').value = client.billingPeriod || 'monthly';
+                document.getElementById('form-dueday').value = client.dueDay;
+                document.getElementById('form-status').value = client.status;
+                document.getElementById('form-lastpay').value = client.lastPayment || '';
+                document.getElementById('form-pix').value = client.pix || '';
+            } else {
+                title.innerHTML = '<i class="fa-solid fa-globe text-emerald-400 mr-2"></i> Cadastrar Aluguel de Site';
+                document.getElementById('client-form').reset();
+                document.getElementById('client-id').value = '';
+                document.getElementById('form-billingperiod').value = 'monthly';
+                document.getElementById('form-status').value = 'active';
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeClientModal() {
+            document.getElementById('modal-client').classList.add('hidden');
+        }
+
+        async function saveClient(e) {
+            e.preventDefault();
+
+            const payload = {
+                id: document.getElementById('client-id').value || null,
+                name: document.getElementById('form-name').value.trim(),
+                phone: document.getElementById('form-phone').value.replace(/\D/g, ''),
+                siteName: document.getElementById('form-sitename').value.trim(),
+                domain: document.getElementById('form-domain').value.trim().toLowerCase().replace(/^https?:\/\//, ''),
+                value: parseFloat(document.getElementById('form-value').value),
+                billingPeriod: document.getElementById('form-billingperiod').value,
+                dueDay: parseInt(document.getElementById('form-dueday').value),
+                status: document.getElementById('form-status').value,
+                lastPayment: document.getElementById('form-lastpay').value,
+                pix: document.getElementById('form-pix').value.trim()
+            };
+
+            await fetch('/api/clients', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            closeClientModal();
+            fetchClients();
+        }
+
+        async function deleteClient(clientId) {
+            const client = clients.find(c => c.id === clientId);
+            if (!client) return;
+
+            if (confirm(`Tem certeza que deseja remover o cliente ${client.name} (${client.domain})?`)) {
+                await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
+                fetchClients();
+            }
+        }
+
+        // WHATSAPP DISPATCH ENGINE
+        function openWhatsAppModal(clientId, defaultTemplate = 'due-3') {
+            const client = clients.find(c => c.id === clientId);
+            if (!client) return;
+
+            currentWAContext.clientId = clientId;
+            currentWAContext.targetPhone = client.phone;
+
+            document.getElementById('wa-template-select').value = defaultTemplate;
+            applyWATemplate();
+
+            document.getElementById('modal-whatsapp').classList.remove('hidden');
+        }
+
+        function closeWhatsAppModal() {
+            document.getElementById('modal-whatsapp').classList.add('hidden');
+        }
+
+        function applyWATemplate() {
+            const clientId = currentWAContext.clientId;
+            const client = clients.find(c => c.id === clientId);
+            if (!client) return;
+
+            const templateType = document.getElementById('wa-template-select').value;
+            const pixKey = client.pix || settings.defaultPix || 'Não informada';
+            const managerName = settings.managerName || 'Sua Empresa Web';
+            const statusInfo = getCalculatedStatus(client);
+            const formattedVal = formatCurrency(client.value);
+            const periodLabel = (PERIOD_MAP[client.billingPeriod || 'monthly'] || PERIOD_MAP['monthly']).label.toLowerCase();
+
+            let msg = '';
+
+            if (templateType === 'due-3') {
+                currentWAContext.targetPhone = client.phone;
+                msg = `Olá, *${client.name}*! Tudo bem? 😃\n\n` +
+                      `Passando para lembrar que o pagamento do aluguel ${periodLabel} do seu site (*${client.domain}*) vence em breve (Dia ${client.dueDay}).\n\n` +
+                      `💰 *Valor (${periodLabel}):* ${formattedVal}\n` +
+                      `🔑 *Chave PIX:* ${pixKey}\n\n` +
+                      `Após realizar o pagamento, por favor envie o comprovante por aqui. Obrigado!\n` +
+                      `— *${managerName}*`;
+            } else if (templateType === 'due-today') {
+                currentWAContext.targetPhone = client.phone;
+                msg = `Olá, *${client.name}*! 😉\n\n` +
+                      `Hoje é o dia de vencimento da mensalidade/renovação ${periodLabel} do seu site *${client.domain}*.\n\n` +
+                      `💰 *Valor:* ${formattedVal}\n` +
+                      `🔑 *Chave PIX:* ${pixKey}\n\n` +
+                      `Qualquer dúvida ou se já efetuou o pagamento, nos avise por aqui! 🙌\n` +
+                      `— *${managerName}*`;
+            } else if (templateType === 'overdue') {
+                currentWAContext.targetPhone = client.phone;
+                msg = `⚠️ *AVISO DE COBRANÇA - ALUGUEL DE SITE*\n\n` +
+                      `Olá, *${client.name}*.\n` +
+                      `Constatamos pendência no pagamento da renovação ${periodLabel} do site *${client.domain}*, vencido no dia ${client.dueDay}.\n\n` +
+                      `💰 *Valor em aberto:* ${formattedVal}\n` +
+                      `🔑 *Chave PIX:* ${pixKey}\n\n` +
+                      `Solicitamos a regularização para evitar a suspensão temporária dos serviços do seu site. Se já realizou o pagamento, envie o comprovante!`;
+            } else if (templateType === 'payment-confirm') {
+                currentWAContext.targetPhone = client.phone;
+                msg = `✅ *PAGAMENTO CONFIRMADO!*\n\n` +
+                      `Olá, *${client.name}*! Recebemos a confirmação do pagamento referente ao aluguel ${periodLabel} do site *${client.domain}*.\n\n` +
+                      `Seu serviço está totalmente regularizado até o próximo ciclo (*${statusInfo.nextDueDateStr}*). Agradecemos a parceria! 🙌\n\n` +
+                      `— *${managerName}*`;
+            } else if (templateType === 'manager-notify') {
+                currentWAContext.targetPhone = settings.managerPhone || client.phone;
+                msg = `🔔 *NOTIFICAÇÃO INTERNA DE GESTÃO*\n\n` +
+                      `• *Cliente:* ${client.name}\n` +
+                      `• *Site:* ${client.domain}\n` +
+                      `• *Ciclo:* ${(PERIOD_MAP[client.billingPeriod || 'monthly'] || PERIOD_MAP['monthly']).label}\n` +
+                      `• *Valor:* ${formattedVal}\n` +
+                      `• *Status Atual:* ${statusInfo.label}\n` +
+                      `• *Próximo Vencimento:* ${statusInfo.nextDueDateStr}\n\n` +
+                      `Painel RentSite Pro.`;
+            }
+
+            document.getElementById('wa-message-text').value = msg;
+        }
+
+        function triggerWASend() {
+            let phone = currentWAContext.targetPhone;
+            const message = document.getElementById('wa-message-text').value;
+
+            if (!phone) {
+                alert('Telefone do destinatário não cadastrado!');
+                return;
+            }
+
+            phone = phone.replace(/\D/g, '');
+            const encodedMsg = encodeURIComponent(message);
+            const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedMsg}`;
+
+            window.open(waUrl, '_blank');
+            closeWhatsAppModal();
+        }
+
+        // MOTOR DE SINCRONIZAÇÃO MULTI-MÁQUINA
+        async function syncWithPeerServer() {
+            let peerUrl = document.getElementById('peer-server-url').value.trim();
+            if (!peerUrl) {
+                peerUrl = prompt("Digite a URL/IP da outra máquina com o RentSite Pro aberto (ex: http://192.168.1.50:5000):");
+            }
+            if (!peerUrl) return;
+
+            try {
+                const remoteRes = await fetch(`${peerUrl.replace(/\/$/, '')}/api/sync/export`);
+                const remoteData = await remoteRes.json();
+
+                const localSyncRes = await fetch('/api/sync/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(remoteData)
+                });
+                const syncResult = await localSyncRes.json();
+
+                const localExportRes = await fetch('/api/sync/export');
+                const localData = await localExportRes.json();
+
+                await fetch(`${peerUrl.replace(/\/$/, '')}/api/sync/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(localData)
+                });
+
+                alert(`Sincronização concluída!\nRegistros atualizados localmente: ${syncResult.syncedClients} cliente(s).`);
+                fetchSettings();
+                fetchClients();
+            } catch (err) {
+                alert('Erro ao conectar com a máquina remota. Verifique a URL/IP e a conexão de rede.');
+                console.error(err);
+            }
+        }
+
+        async function exportJSON() {
+            const res = await fetch('/api/sync/export');
+            const data = await res.json();
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `backup_rentsite_sqlite_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importJSON(e) {
+            const fileReader = new FileReader();
+            fileReader.onload = async function (event) {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    const res = await fetch('/api/sync/import', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(importedData)
+                    });
+                    const result = await res.json();
+                    alert(`Importação concluída! ${result.syncedClients} registros atualizados.`);
+                    fetchSettings();
+                    fetchClients();
+                } catch (err) {
+                    alert('Erro ao ler ou importar o arquivo JSON.');
+                }
+            };
+            fileReader.readAsText(event.target.files[0]);
+        }
+
+        function formatCurrency(val) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+    </script>
+</body>
+</html>
